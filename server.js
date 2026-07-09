@@ -5,6 +5,7 @@ const pool = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const customerRoutes = require('./routes/customerRoutes');
+const routeRoutes = require('./routes/routeRoutes');
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/routes', routeRoutes);
 
 // Test route to confirm server + DB are working
 app.get('/api/health', async (req, res) => {
