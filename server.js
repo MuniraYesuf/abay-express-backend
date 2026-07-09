@@ -6,6 +6,7 @@ const authRoutes = require('./routes/authRoutes');
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const routeRoutes = require('./routes/routeRoutes');
+const shipmentRoutes = require('./routes/shipmentRoutes');
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/routes', routeRoutes);
+app.use('/api/shipments', shipmentRoutes);
 
 // Test route to confirm server + DB are working
 app.get('/api/health', async (req, res) => {
