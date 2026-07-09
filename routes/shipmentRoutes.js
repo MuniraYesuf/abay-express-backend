@@ -10,6 +10,7 @@ const {
   removeShipment
 } = require('../controllers/shipmentController');
 const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
+const { shipmentValidation } = require('../middleware/validators');
 
 // All shipment routes require a valid token
 router.use(verifyToken);
@@ -25,7 +26,7 @@ router.get('/', authorizeRoles('manager'), listShipments);
 router.get('/:id', getShipment); // both roles allowed; ownership checked inside controller
 
 // Manager-only: create and delete
-router.post('/', authorizeRoles('manager'), addShipment);
+router.post('/', authorizeRoles('manager'), shipmentValidation, addShipment);
 router.delete('/:id', authorizeRoles('manager'), removeShipment);
 
 // Both managers and drivers can update status (ownership checked inside controller)
