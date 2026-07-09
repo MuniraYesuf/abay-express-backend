@@ -7,12 +7,14 @@ const vehicleRoutes = require('./routes/vehicleRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const routeRoutes = require('./routes/routeRoutes');
 const shipmentRoutes = require('./routes/shipmentRoutes');
+const { generalLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(generalLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);
