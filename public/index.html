@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Abay Express - Logistics Dashboard</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 20px; background: #f4f4f4; }
+  h1 { color: #1a5632; }
+  .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  input, select, button, textarea { display: block; width: 100%; padding: 8px; margin: 6px 0; box-sizing: border-box; }
+  button { background: #1a5632; color: white; border: none; cursor: pointer; padding: 10px; }
+  button:hover { background: #14472a; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
+  th { background: #eee; }
+  .hidden { display: none; }
+  #status-msg { color: #b00020; font-weight: bold; }
+  .logout { background: #999; float: right; width: auto; padding: 6px 12px; }
+</style>
+</head>
+<body>
+
+<h1>Abay Express — Logistics Dashboard</h1>
+<p id="status-msg"></p>
+
+<!-- LOGIN -->
+<div id="login-section" class="card">
+  <h2>Login</h2>
+  <input type="email" id="login-email" placeholder="Email">
+  <input type="password" id="login-password" placeholder="Password">
+  <button onclick="login()">Login</button>
+
+  <h3>Register</h3>
+  <input type="text" id="reg-name" placeholder="Full Name">
+  <input type="email" id="reg-email" placeholder="Email">
+  <input type="password" id="reg-password" placeholder="Password (min 6 chars)">
+  <select id="reg-role">
+    <option value="manager">Manager</option>
+    <option value="driver">Driver</option>
+  </select>
+  <button onclick="register()">Register</button>
+</div>
+
+<!-- MANAGER DASHBOARD -->
+<div id="manager-section" class="hidden">
+  <button class="logout" onclick="logout()">Logout</button>
+  <h2>Manager Dashboard — <span id="manager-name"></span></h2>
+
+  <div class="card">
+    <h3>Add Vehicle</h3>
+    <input type="text" id="veh-plate" placeholder="Plate Number (e.g. AA-30123)">
+    <input type="number" id="veh-capacity" placeholder="Capacity (kg)">
+    <button onclick="addVehicle()">Add Vehicle</button>
+    <button onclick="loadVehicles()">Refresh Vehicle List</button>
+    <table id="vehicles-table"><thead><tr><th>ID</th><th>Plate</th><th>Capacity (kg)</th><th>Status</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>Add Customer</h3>
+    <input type="text" id="cust-name" placeholder="Customer Name">
+    <input type="text" id="cust-address" placeholder="Address (e.g. Bole, Addis Ababa)">
+    <input type="text" id="cust-phone" placeholder="Phone">
+    <button onclick="addCustomer()">Add Customer</button>
+    <button onclick="loadCustomers()">Refresh Customer List</button>
+    <table id="customers-table"><thead><tr><th>ID</th><th>Name</th><th>Address</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>Create Route</h3>
+    <input type="number" id="route-driver" placeholder="Driver User ID">
+    <input type="number" id="route-vehicle" placeholder="Vehicle ID">
+    <input type="date" id="route-date">
+    <button onclick="addRoute()">Create Route</button>
+    <button onclick="loadRoutes()">Refresh Route List</button>
+    <table id="routes-table"><thead><tr><th>ID</th><th>Driver</th><th>Plate</th><th>Date</th><th>Status</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>Create Shipment</h3>
+    <input type="number" id="ship-route" placeholder="Route ID">
+    <input type="number" id="ship-customer" placeholder="Customer ID">
+    <input type="number" id="ship-weight" placeholder="Weight (kg)">
+    <input type="text" id="ship-dims" placeholder="Dimensions (e.g. 100x50x50 cm)">
+    <button onclick="addShipment()">Create Shipment</button>
+    <button onclick="loadShipments()">Refresh Shipment List</button>
+    <table id="shipments-table"><thead><tr><th>ID</th><th>Customer</th><th>Weight</th><th>Status</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<!-- DRIVER DASHBOARD -->
+<div id="driver-section" class="hidden">
+  <button class="logout" onclick="logout()">Logout</button>
+  <h2>Driver Portal — <span id="driver-name"></span></h2>
+
+  <div class="card">
+    <h3>My Routes</h3>
+    <button onclick="loadMyRoutes()">Refresh My Routes</button>
+    <table id="my-routes-table"><thead><tr><th>ID</th><th>Plate</th><th>Date</th><th>Status</th></tr></thead><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h3>My Shipments</h3>
+    <button onclick="loadMyShipments()">Refresh My Shipments</button>
+    <table id="my-shipments-table"><thead><tr><th>ID</th><th>Customer</th><th>Status</th><th>Update</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:5000/api';
+let token = localStorageFallback('get');
+let currentUser = null;
+
+// Simple in-memory fallback since artifacts can't use localStorage,
+// but this is a real local file running in YOUR browser, so localStorage works fine here.
+function localStorageFallback(action, value) {
+  if (action === 'get') return localStorage.getItem('token');
+  if (action === 'set') localStorage.setItem('token', value);
+  if (action === 'clear') localStorage.removeItem('token');
+}
+
+function showMsg(text, isError = true) {
+  const el = document.getElementById('status-msg');
+  el.style.color = isError ? '#b00020' : '#1a5632';
+  el.textContent = text;
+  setTimeout(() => el.textContent = '', 4000);
+}
+
+async function apiCall(path, method = 'GET', body = null) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const res = await fetch(API + path, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : null
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Request failed');
+  return data;
+}
+
+async function register() {
+  try {
+    await apiCall('/auth/register', 'POST', {
+      name: document.getElementById('reg-name').value,
+      email: document.getElementById('reg-email').value,
+      password: document.getElementById('reg-password').value,
+      role: document.getElementById('reg-role').value
+    });
+    showMsg('Registered successfully. Now log in.', false);
+  } catch (err) {
+    showMsg(err.message);
+  }
+}
+
+async function login() {
+  try {
+    const data = await apiCall('/auth/login', 'POST', {
+      email: document.getElementById('login-email').value,
+      password: document.getElementById('login-password').value
+    });
+    token = data.token;
+    localStorageFallback('set', token);
+    currentUser = data.user;
+    showDashboard();
+  } catch (err) {
+    showMsg(err.message);
+  }
+}
+
+function logout() {
+  token = null;
+  currentUser = null;
+  localStorageFallback('clear');
+  document.getElementById('login-section').classList.remove('hidden');
+  document.getElementById('manager-section').classList.add('hidden');
+  document.getElementById('driver-section').classList.add('hidden');
+}
+
+function showDashboard() {
+  document.getElementById('login-section').classList.add('hidden');
+  if (currentUser.role === 'manager') {
+    document.getElementById('manager-section').classList.remove('hidden');
+    document.getElementById('manager-name').textContent = currentUser.name;
+    loadVehicles(); loadCustomers(); loadRoutes(); loadShipments();
+  } else {
+    document.getElementById('driver-section').classList.remove('hidden');
+    document.getElementById('driver-name').textContent = currentUser.name;
+    loadMyRoutes(); loadMyShipments();
+  }
+}
+
+// ---- VEHICLES ----
+async function addVehicle() {
+  try {
+    await apiCall('/vehicles', 'POST', {
+      plateNumber: document.getElementById('veh-plate').value,
+      capacityKg: Number(document.getElementById('veh-capacity').value)
+    });
+    showMsg('Vehicle added.', false);
+    loadVehicles();
+  } catch (err) { showMsg(err.message); }
+}
+async function loadVehicles() {
+  const data = await apiCall('/vehicles');
+  const tbody = document.querySelector('#vehicles-table tbody');
+  tbody.innerHTML = data.vehicles.map(v =>
+    `<tr><td>${v.id}</td><td>${v.plate_number}</td><td>${v.capacity_kg}</td><td>${v.status}</td></tr>`
+  ).join('');
+}
+
+// ---- CUSTOMERS ----
+async function addCustomer() {
+  try {
+    await apiCall('/customers', 'POST', {
+      name: document.getElementById('cust-name').value,
+      address: document.getElementById('cust-address').value,
+      phone: document.getElementById('cust-phone').value
+    });
+    showMsg('Customer added.', false);
+    loadCustomers();
+  } catch (err) { showMsg(err.message); }
+}
+async function loadCustomers() {
+  const data = await apiCall('/customers');
+  const tbody = document.querySelector('#customers-table tbody');
+  tbody.innerHTML = data.customers.map(c =>
+    `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.address}</td></tr>`
+  ).join('');
+}
+
+// ---- ROUTES ----
+async function addRoute() {
+  try {
+    await apiCall('/routes', 'POST', {
+      driverId: Number(document.getElementById('route-driver').value),
+      vehicleId: Number(document.getElementById('route-vehicle').value),
+      routeDate: document.getElementById('route-date').value
+    });
+    showMsg('Route created.', false);
+    loadRoutes();
+  } catch (err) { showMsg(err.message); }
+}
+async function loadRoutes() {
+  const data = await apiCall('/routes');
+  const tbody = document.querySelector('#routes-table tbody');
+  tbody.innerHTML = data.routes.map(r =>
+    `<tr><td>${r.id}</td><td>${r.driver_name}</td><td>${r.plate_number}</td><td>${new Date(r.route_date).toLocaleDateString()}</td><td>${r.status}</td></tr>`
+  ).join('');
+}
+
+// ---- SHIPMENTS ----
+async function addShipment() {
+  try {
+    await apiCall('/shipments', 'POST', {
+      routeId: Number(document.getElementById('ship-route').value),
+      customerId: Number(document.getElementById('ship-customer').value),
+      weightKg: Number(document.getElementById('ship-weight').value),
+      dimensions: document.getElementById('ship-dims').value
+    });
+    showMsg('Shipment created.', false);
+    document.getElementById('ship-route').value = '';
+    document.getElementById('ship-customer').value = '';
+    document.getElementById('ship-weight').value = '';
+    document.getElementById('ship-dims').value = '';
+    loadShipments();
+  } catch (err) { showMsg(err.message); }
+}
+async function loadShipments() {
+  const data = await apiCall('/shipments');
+  const tbody = document.querySelector('#shipments-table tbody');
+  tbody.innerHTML = data.shipments.map(s =>
+    `<tr><td>${s.id}</td><td>${s.customer_name}</td><td>${s.weight_kg} kg</td><td>${s.status}</td></tr>`
+  ).join('');
+}
+
+// ---- DRIVER PORTAL ----
+async function loadMyRoutes() {
+  const data = await apiCall('/routes/mine');
+  const tbody = document.querySelector('#my-routes-table tbody');
+  tbody.innerHTML = data.routes.map(r =>
+    `<tr><td>${r.id}</td><td>${r.plate_number}</td><td>${new Date(r.route_date).toLocaleDateString()}</td><td>${r.status}</td></tr>`
+  ).join('');
+}
+async function loadMyShipments() {
+  const data = await apiCall('/shipments/mine');
+  const tbody = document.querySelector('#my-shipments-table tbody');
+  tbody.innerHTML = data.shipments.map(s => {
+    const nextStatus = { pending: 'assigned', assigned: 'in_transit', in_transit: 'delivered' }[s.status];
+    const btn = nextStatus ? `<button onclick="advanceStatus(${s.id}, '${nextStatus}')">Mark ${nextStatus}</button>` : 'Delivered';
+    return `<tr><td>${s.id}</td><td>${s.customer_name}</td><td>${s.status}</td><td>${btn}</td></tr>`;
+  }).join('');
+}
+async function advanceStatus(shipmentId, newStatus) {
+  try {
+    await apiCall(`/shipments/${shipmentId}/status`, 'PATCH', { status: newStatus, notes: 'Updated via driver portal' });
+    showMsg('Status updated.', false);
+    loadMyShipments();
+  } catch (err) { showMsg(err.message); }
+}
+
+// On page load, if a token exists, try to jump straight to dashboard
+if (token) {
+  // We don't have a "get current user" endpoint, so just show login again if no session info.
+  // Simplification given time constraints — user just logs in again if page refreshes.
+}
+</script>
+
+</body>
+</html>
